@@ -1,1 +1,124 @@
-
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>今天吃什麼？—— 互動美食決策器</title>
+  <style>
+    :root {
+      --primary: #ff6b6b;
+      --secondary: #4ecdc4;
+      --dark: #2f3542;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; color: var(--dark); }
+    header { text-align: center; margin-bottom: 20px; }
+    h1 { font-size: 2.2rem; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+    p.subtitle { color: #fff; opacity: 0.9; }
+    .container { background: white; width: 100%; max-width: 500px; border-radius: 20px; padding: 25px; box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
+    .card-container { perspective: 1000px; width: 100%; height: 220px; margin: 20px 0; }
+    .card { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); cursor: pointer; }
+    .card.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+    .card-front { background: linear-gradient(45deg, var(--primary), #ff8e8e); color: white; }
+    .card-back { background: #f8f9fa; border: 3px solid var(--secondary); color: var(--dark); transform: rotateY(180deg); }
+    .food-emoji { font-size: 4rem; margin-bottom: 10px; }
+    .food-title { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+    .food-desc { font-size: 0.95rem; color: #666; margin-top: 5px; }
+    .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4); }
+    .section-title { margin-top: 25px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+    .input-group { display: flex; gap: 8px; margin-bottom: 15px; }
+    input[type="text"] { flex: 1; padding: 10px 15px; border: 2px solid #ddd; border-radius: 8px; outline: none; }
+    .btn-add { background: var(--secondary); color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .tag-container { display: flex; flex-wrap: wrap; gap: 8px; max-height: 120px; overflow-y: auto; }
+    .tag { background: #eef2f5; padding: 6px 12px; border-radius: 20px; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+    .tag .remove-btn { color: #999; cursor: pointer; font-weight: bold; }
+    .history-list { list-style: none; font-size: 0.9rem; color: #666; }
+    .history-list li { padding: 4px 0; border-bottom: 1px dashed #eee; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>今天吃什麼？</h1>
+    <p class="subtitle">告別選擇困難，點擊卡牌抽出一餐！</p>
+  </header>
+  <div class="container">
+    <div class="card-container">
+      <div class="card" id="foodCard" onclick="drawFood()">
+        <div class="card-face card-front">
+          <div class="food-emoji">❓</div>
+          <h2>點擊翻牌抽餐點</h2>
+        </div>
+        <div class="card-face card-back">
+          <div class="food-emoji" id="resEmoji">🍱</div>
+          <div class="food-title" id="resTitle">牛肉麵</div>
+          <div class="food-desc" id="resDesc">熱騰騰的大口吃肉最幸福！</div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" onclick="drawFood()">🎲 隨機抽一個！</button>
+    <div class="section-title">自訂口袋名單</div>
+    <div class="input-group">
+      <input type="text" id="customInput" placeholder="輸入你想吃的，例如：火鍋">
+      <button class="btn-add" onclick="addFood()">新增</button>
+    </div>
+    <div class="tag-container" id="tagContainer"></div>
+    <div class="section-title">最近抽到</div>
+    <ul class="history-list" id="historyList">
+      <li>尚未開始抽取...</li>
+    </ul>
+  </div>
+  <script>
+    const defaultFoods = [
+      { name: "牛肉麵", emoji: "🍜", desc: "香濃湯頭配上紅燒牛肉" },
+      { name: "健康餐盒", emoji: "🥗", desc: "清爽無負擔，補充優質蛋白質" },
+      { name: "炸雞漢堡", emoji: "🍔", desc: "罪惡感滿滿但超級快樂！" },
+      { name: "壽司生魚片", emoji: "🍣", desc: "鮮甜海味，輕盈好滋味" },
+      { name: "義大利麵", emoji: "🍝", desc: "濃郁白醬或醬汁的完美融合" },
+      { name: "滷肉飯 + 貢丸湯", emoji: "🍚", desc: "最經典道地的台灣在地美味" }
+    ];
+    let foodList = JSON.parse(localStorage.getItem("myFoods")) || defaultFoods;
+    let history = [];
+    const card = document.getElementById("foodCard");
+    const resTitle = document.getElementById("resTitle");
+    const resEmoji = document.getElementById("resEmoji");
+    const resDesc = document.getElementById("resDesc");
+    const tagContainer = document.getElementById("tagContainer");
+    const historyList = document.getElementById("historyList");
+    function renderTags() {
+      tagContainer.innerHTML = "";
+      foodList.forEach((item, index) => {
+        const tag = document.createElement("div");
+        tag.className = "tag";
+        tag.innerHTML = `${item.emoji || '😋'} ${item.name} <span class="remove-btn" onclick="removeFood(${index})">×</span>`;
+        tagContainer.appendChild(tag);
+      });
+      localStorage.setItem("myFoods", JSON.stringify(foodList));
+    }
+    function drawFood() {
+      if (foodList.length === 0) { alert("口袋名單是空的，請先新增選項！"); return; }
+      if (card.classList.contains("flipped")) { card.classList.remove("flipped"); setTimeout(executeDraw, 300); }
+      else { executeDraw(); }
+    }
+    function executeDraw() {
+      const randomIndex = Math.floor(Math.random() * foodList.length);
+      const selected = foodList[randomIndex];
+      resTitle.textContent = selected.name;
+      resEmoji.textContent = selected.emoji || "😋";
+      resDesc.textContent = selected.desc || "讚啦！今天就決定吃這個了！";
+      card.classList.add("flipped");
+      history.unshift(`${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${selected.name}`);
+      if (history.length > 5) history.pop();
+      renderHistory();
+    }
+    function addFood() {
+      const input = document.getElementById("customInput");
+      const text = input.value.trim();
+      if (text) { foodList.push({ name: text, emoji: "🍱", desc: "你的自訂美味選單" }); input.value = ""; renderTags(); }
+    }
+    function removeFood(index) { foodList.splice(index, 1); renderTags(); }
+    function renderHistory() { historyList.innerHTML = history.map(item => `<li>${item}</li>`).join(''); }
+    renderTags();
+  </script>
+</body>
+</html>
